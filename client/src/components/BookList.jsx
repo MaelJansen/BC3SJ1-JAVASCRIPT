@@ -7,6 +7,7 @@ const BookList = () => {
   const [books, setBooks] = useState([]);
   const [userRole, setUserRole] = useState("");
   const [returnDate, setReturnDate] = useState("");
+  const [borrowedBooks, setBorrowedBooks] = useState([]);
   const base = import.meta.env.VITE_BASE_URL || "/";
 
   useEffect(() => {
@@ -25,6 +26,13 @@ const BookList = () => {
       })
       .then((data) => setUserRole(data.user.role || "Guest"))
       .catch((error) => setUserRole("Guest"));
+    fetch(base + "api/borrow", { credentials: "include" })
+      .then((response) => {
+        if (response.status === 200) return response.json();
+        else throw new Error("Borrowed books not founds");
+      })
+      .then((data) => setBorrowedBooks(data))
+      .catch((error) => console.error("Erreur:", error));
   }, []);
 
   const handleAddBook = () => {
@@ -56,6 +64,37 @@ const BookList = () => {
         body: JSON.stringify({
           bookId: bookId,
           returnDate: returnDate,
+        }),
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (response.status === 200) {
+        window.location.reload();
+      } else {
+        setError(
+          data.message || "Une erreur est survenue. Veuillez réessayer."
+        );
+      }
+    } catch (err) {
+      setError("Une erreur est survenue. Veuillez réessayer.");
+    }
+  };
+
+  const isBorrowedByCurrentUser = (bookId) => {
+    return borrowedBooks.find((borrow) => borrow.livres_id == bookId);
+  };
+
+  const handleReturn = async (bookId) => {
+    try {
+      const response = await fetch(base + "api/borrow/return", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookId: bookId,
         }),
         credentials: "include",
       });
@@ -109,7 +148,13 @@ const BookList = () => {
                 </td>
                 <td>
                   {book.statut == "emprunté" ? (
-                    <p>Indisponible</p>
+                    isBorrowedByCurrentUser(book.id) ? (
+                      <button onClick={() => handleReturn(book.id)}>
+                        Retourner
+                      </button>
+                    ) : (
+                      <p>Indisponible</p>
+                    )
                   ) : (
                     <div>
                       <input
